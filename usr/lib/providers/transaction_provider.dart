@@ -1,48 +1,61 @@
 import 'package:flutter/material.dart';
-import 'package:couldai_user_app/models/transaction_model.dart';
-import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:couldai_user_app/models/transaction_model.dart' as model;
 
 class TransactionProvider with ChangeNotifier {
   final List<String> _members = ['Bibash', 'Sandesh', 'Janak', 'Ranjit'];
-  List<Transaction> _transactions = [];
+  List<model.Transaction> _transactions = [];
   Map<String, Map<String, double>> _balances = {};
 
   List<String> get members => _members;
-  List<Transaction> get transactions => [..._transactions];
+  List<model.Transaction> get transactions => [..._transactions];
   Map<String, Map<String, double>> get balances => _balances;
 
   TransactionProvider() {
-    _addInitialData();
-    _calculateBalances();
+    _initFirestoreListener();
   }
 
-  void _addInitialData() {
-    _transactions = [
-      Transaction(id: 't1', description: 'Lunch at Restaurant', paidBy: 'Bibash', amount: 1200, splitMembers: ['Bibash', 'Sandesh', 'Janak', 'Ranjit'], timestamp: DateTime.now().subtract(const Duration(days: 1))),
-      Transaction(id: 't2', description: 'Movie Tickets', paidBy: 'Sandesh', amount: 800, splitMembers: ['Sandesh', 'Ranjit'], timestamp: DateTime.now().subtract(const Duration(hours: 5))),
-      Transaction(id: 't3', description: 'Groceries', paidBy: 'Janak', amount: 1500, splitMembers: ['Janak', 'Bibash'], timestamp: DateTime.now().subtract(const Duration(days: 2))),
-    ];
-    _transactions.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  void _initFirestoreListener() {
+    FirebaseFirestore.instance
+        .collection('transactions')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      _transactions = snapshot.docs.map((doc) {
+        return model.Transaction.fromFirestore(doc);
+      }).toList();
+      
+      _calculateBalances();
+      notifyListeners();
+    }, onError: (error) {
+      debugPrint("Error listening to transactions: $error");
+    });
   }
 
-  void addTransaction(String description, String paidBy, double amount, List<String> splitMembers) {
-    final newTransaction = Transaction(
-      id: 't${Random().nextInt(1000)}',
-      description: description,
-      paidBy: paidBy,
-      amount: amount,
-      splitMembers: splitMembers,
-      timestamp: DateTime.now(),
-    );
-    _transactions.insert(0, newTransaction);
-    _calculateBalances();
-    notifyListeners();
+  Future<void> addTransaction(String description, String paidBy, double amount, List<String> splitMembers) async {
+    try {
+      await FirebaseFirestore.instance.collection('transactions').add({
+        'description': description,
+        'paidBy': paidBy,
+        'amount': amount,
+        'splitMembers': splitMembers,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+      // No need to manually update _transactions or notifyListeners, 
+      // the snapshot listener will handle it automatically.
+    } catch (e) {
+      debugPrint("Error adding transaction: $e");
+      rethrow;
+    }
   }
 
-  void deleteTransaction(String id) {
-    _transactions.removeWhere((tx) => tx.id == id);
-    _calculateBalances();
-    notifyListeners();
+  Future<void> deleteTransaction(String id) async {
+    try {
+      await FirebaseFirestore.instance.collection('transactions').doc(id).delete();
+    } catch (e) {
+      debugPrint("Error deleting transaction: $e");
+      rethrow;
+    }
   }
 
   void _calculateBalances() {

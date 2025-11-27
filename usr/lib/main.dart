@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'package:couldai_user_app/providers/transaction_provider.dart';
 import 'package:couldai_user_app/screens/home_screen.dart';
 import 'package:couldai_user_app/screens/profile_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: "AIzaSyBBOgprUj391m-LjHDbtlCZz24eu-xtlpY",
+      authDomain: "khata-data-18c36.firebaseapp.com",
+      projectId: "khata-data-18c36",
+      storageBucket: "khata-data-18c36.firebasestorage.app",
+      messagingSenderId: "178093558450",
+      appId: "1:178093558450:web:38a9c0aabb022c1a1297ab",
+    ),
+  );
+
   runApp(const MyApp());
 }
 
